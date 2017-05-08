@@ -1,0 +1,963 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next pisces use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="皮儿猪猪" />
+
+
+
+
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0" />
+
+
+
+
+
+
+<meta name="description" content="我以为我们同属于/30，ping出timed out才明白处于不同的VLAN。我尝试着用爱做为route，并用Tracer来验证，可是netstat的## syn_received ##结果让我无比伤心。  大概是去年在某童鞋QQ签名看到过这句话，很有意思。恐怕只有比较了解网络的童鞋才能读懂吧？ 最近突发感慨，登上许久不玩的QQ，翻出来签名给Copy了下来，细细琢磨一番，我想一定会有所悟。 针对">
+<meta name="keywords">
+<meta property="og:type" content="article">
+<meta property="og:title" content="一句矫情引起的TCP深入">
+<meta property="og:url" content="http://dongge.org/2017/05/08/Hypocritical/index.html">
+<meta property="og:site_name" content="皮儿猪猪">
+<meta property="og:description" content="我以为我们同属于/30，ping出timed out才明白处于不同的VLAN。我尝试着用爱做为route，并用Tracer来验证，可是netstat的## syn_received ##结果让我无比伤心。  大概是去年在某童鞋QQ签名看到过这句话，很有意思。恐怕只有比较了解网络的童鞋才能读懂吧？ 最近突发感慨，登上许久不玩的QQ，翻出来签名给Copy了下来，细细琢磨一番，我想一定会有所悟。 针对">
+<meta property="og:image" content="http://dongge.org/images/pic/tcp-1.png">
+<meta property="og:image" content="http://dongge.org/images/pic/tcp-2.png">
+<meta property="og:image" content="http://dongge.org/images/pic/tcp-3.png">
+<meta property="og:image" content="http://dongge.org/images/pic/tcp-4.png">
+<meta property="og:image" content="http://dongge.org/images/pic/tcp-5.png">
+<meta property="og:image" content="http://dongge.org/images/pic/tcp-6.png">
+<meta property="og:updated_time" content="2017-05-08T05:01:06.341Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="一句矫情引起的TCP深入">
+<meta name="twitter:description" content="我以为我们同属于/30，ping出timed out才明白处于不同的VLAN。我尝试着用爱做为route，并用Tracer来验证，可是netstat的## syn_received ##结果让我无比伤心。  大概是去年在某童鞋QQ签名看到过这句话，很有意思。恐怕只有比较了解网络的童鞋才能读懂吧？ 最近突发感慨，登上许久不玩的QQ，翻出来签名给Copy了下来，细细琢磨一番，我想一定会有所悟。 针对">
+<meta name="twitter:image" content="http://dongge.org/images/pic/tcp-1.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Pisces',
+    sidebar: {"position":"left","display":"post","offset":12,"offset_float":0,"b2t":false,"scrollpercent":false},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://dongge.org/2017/05/08/Hypocritical/"/>
+
+
+
+
+
+  <title> 一句矫情引起的TCP深入 | 皮儿猪猪 </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+
+
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?faaeeec048c341d57e12adb7e9e28ac0";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">皮儿猪猪</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">Hello Display</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-commonweal">
+          <a href="/404.html" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-heartbeat"></i> <br />
+            
+            公益404
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+    <link itemprop="mainEntityOfPage" href="http://dongge.org/2017/05/08/Hypocritical/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="皮儿猪猪">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="皮儿猪猪">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                一句矫情引起的TCP深入
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2017-05-08T12:59:03+08:00">
+                2017-05-08
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2017/05/08/Hypocritical/" class="leancloud_visitors" data-flag-title="一句矫情引起的TCP深入">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">阅读次数 </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+            <span class="post-meta-divider">|</span>
+            <span class="page-pv"><i class="fa fa-file-o"></i>
+            <span class="busuanzi-value" id="busuanzi_value_page_pv" ></span>
+            </span>
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <blockquote>
+<p>我以为我们同属于/30，ping出timed out才明白处于不同的VLAN。我尝试着用爱做为route，并用Tracer来验证，可是netstat的<strong>## syn_received ##</strong>结果让我无比伤心。</p>
+</blockquote>
+<p>大概是去年在某童鞋QQ签名看到过这句话，很有意思。恐怕只有比较了解网络的童鞋才能读懂吧？</p>
+<p>最近突发感慨，登上许久不玩的QQ，翻出来签名给Copy了下来，细细琢磨一番，我想一定会有所悟。</p>
+<p>针对这句话前边都可以看懂，只有syn_received这个状态略有陌生，记得之前专门查了一次，可没多久就忘了；这就是不用则废呀，所以最近把博客搬到了Github，一个存在永远的地方。能懂，能说，能写，写下来才是沉淀，以后一定要多动笔，记录一些杂七杂八的东西；<br><a id="more"></a></p>
+<p>废话不多说</p>
+<h2 id="建立连接："><a href="#建立连接：" class="headerlink" title="建立连接："></a>建立连接：</h2><p><strong>理解：窗口和滑动窗口</strong></p>
+<ol>
+<li>TCP的流量控制</li>
+</ol>
+<p>TCP使用窗口机制进行流量控制</p>
+<p>什么是窗口？</p>
+<p>连接建立时，各端分配一块缓冲区用来存储接收的数据，并将缓冲区的尺寸发送给另一端</p>
+<p>接收方发送的确认信息中包含了自己剩余的缓冲区尺寸</p>
+<p>剩余缓冲区空间的数量叫做窗口</p>
+<ol>
+<li>TCP的流控过程（滑动窗口）</li>
+</ol>
+<p><img src="http://dongge.org/images/pic/tcp-1.png" alt=""></p>
+<p><strong>TCP(Transmission Control Protocol)　传输控制协议</strong></p>
+<p><strong>三次握手</strong></p>
+<p>TCP是主机对主机层的传输控制协议，提供可靠的连接服务，采用三次握手确认建立一个连接:</p>
+<p>位码即tcp标志位,有6种标示:</p>
+<pre><code>SYN(synchronous建立联机)
+
+ACK(acknowledgement 确认)
+
+PSH(push传送)
+
+FIN(finish结束)
+
+RST(reset重置)
+
+URG(urgent紧急)
+
+Sequence number(顺序号码)
+
+Acknowledge number(确认号码)
+</code></pre><p>客户端TCP状态迁移：</p>
+<pre><code>CLOSED-&gt;SYN_SENT-&gt;ESTABLISHED-&gt;FIN_WAIT_1-&gt;FIN_WAIT_2-&gt;TIME_WAIT-&gt;CLOSED
+</code></pre><p>服务器TCP状态迁移：</p>
+<pre><code>CLOSED-&gt;LISTEN-&gt;SYN收到-&gt;ESTABLISHED-&gt;CLOSE_WAIT-&gt;LAST_ACK-&gt;CLOSED
+</code></pre><p><img src="http://dongge.org/images/pic/tcp-2.png" alt=""></p>
+<p>各个状态的意义如下： </p>
+<pre><code>LISTEN - 侦听来自远方TCP端口的连接请求； 
+SYN-SENT -在发送连接请求后等待匹配的连接请求； 
+**SYN-RECEIVED** - 在收到和发送一个连接请求后等待对连接请求的确认； (意思是收不到确认，常见于客户端在发送SYN后意外掉线，或者SYN Flood）
+ESTABLISHED- 代表一个打开的连接，数据可以传送给用户； 
+FIN-WAIT-1 - 等待远程TCP的连接中断请求，或先前的连接中断请求的确认；
+FIN-WAIT-2 - 从远程TCP等待连接中断请求； 
+CLOSE-WAIT - 等待从本地用户发来的连接中断请求； 
+CLOSING -等待远程TCP对连接中断的确认； 
+LAST-ACK - 等待原来发向远程TCP的连接中断请求的确认； 
+TIME-WAIT -等待足够的时间以确保远程TCP接收到连接中断请求的确认； 
+CLOSED - 没有任何连接状态；
+</code></pre><p>TCP/IP协议中，TCP协议提供可靠的连接服务，采用三次握手建立一个连接，如图1所示。</p>
+<p><img src="http://dongge.org/images/pic/tcp-3.png" alt=""></p>
+<p>（1）第一次握手：建立连接时，客户端A发送SYN包（SYN=j）到服务器B，并进入SYN_SEND状态，等待服务器B确认。</p>
+<p>（2）第二次握手：服务器B收到SYN包，必须确认客户A的SYN（ACK=j+1），同时自己也发送一个SYN包（SYN=k），即SYN+ACK包，此时服务器B进入SYN_RECV状态。</p>
+<p>（3）第三次握手：客户端A收到服务器B的SYN＋ACK包，向服务器B发送确认包ACK（ACK=k+1），此包发送完毕，客户端A和服务器B进入ESTABLISHED状态，完成三次握手。</p>
+<p>完成三次握手，客户端与服务器开始传送数据。</p>
+<p><strong>确认号：其数值等于发送方的发送序号 +1(即接收方期望接收的下一个序列号)。</strong></p>
+<h2 id="TCP的包头结构："><a href="#TCP的包头结构：" class="headerlink" title="TCP的包头结构："></a>TCP的包头结构：</h2><p><img src="http://dongge.org/images/pic/tcp-4.png" alt=""></p>
+<p>TCP的包头结构：</p>
+<pre><code>源端口 16位
+目标端口 16位
+序列号 32位
+回应序号 32位
+TCP头长度 4位
+reserved 6位
+控制代码 6位
+窗口大小 16位
+偏移量 16位
+校验和 16位
+选项  32位(可选)
+这样我们得出了TCP包头的最小长度，为20字节
+</code></pre><p><strong>下面是具体的例子截图：</strong></p>
+<p><img src="http://dongge.org/images/pic/tcp-5.png" alt=""></p>
+<p>此图包含两部分信息：</p>
+<ol>
+<li>TCP的三次握手(方框中的内容） （SYN, (SYN+ACK), ACK)</li>
+<li>TCP的数据传输 （[TCP segment of a reassembled PUD])<br>可以看出，server是将数据TCP层对消息包进行分片传输;</li>
+</ol>
+<p>(1)Server端收到HTTP请求如GET之后，构造响应消息，其中携带网页内容，在server端的HTTP层发送消息200 OK-&gt;server端的TCP层； </p>
+<p>(2)server端的TCP层对消息包进行分片传输； </p>
+<p>(3)client端的TCP层对接收到的各个消息包分片回送响应； </p>
+<p>(4)client端的TCP层每次收到一部分都会用ACK确认，之后server继续传输，client继续确认，直到完成响应消息的所有分片之后，Server发送组合HTTP响应包 200 OK，此时在client端的消息跟踪中才可以显示HTTP 200 OK的消息包</p>
+<h2 id="关闭连接："><a href="#关闭连接：" class="headerlink" title="关闭连接："></a>关闭连接：</h2><p>由于TCP连接是全双工的，因此每个方向都必须单独进行关闭。<br>这个原则是当一方完成它的数据发送任务后就能发送一个FIN来终止这个方向的连接。<br>收到一个 FIN只意味着这一方向上没有数据流动，一个TCP连接在收到一个FIN后仍能发送数据。</p>
+<p>首先进行关闭的一方将执行主动关闭，而另一方执行被动关闭。</p>
+<p> TCP的连接的拆除需要发送四个包，因此称为<strong>四次挥手</strong>(four-way handshake)。</p>
+<p>客户端或服务器均可主动发起挥手动作，在socket编程中，任何一方执行close()操作即可产生挥手操作。</p>
+<p>（1）客户端A发送一个FIN，用来关闭客户A到服务器B的数据传送。 </p>
+<p>（2）服务器B收到这个FIN，它发回一个ACK，确认序号为收到的序号加1。和SYN一样，一个FIN将占用一个序号。 </p>
+<p>（3）服务器B关闭与客户端A的连接，发送一个FIN给客户端A。 </p>
+<p>（4）客户端A发回ACK报文确认，并将确认序号设置为收到序号加1。 </p>
+<p>TCP采用四次挥手关闭连接如图2所示。</p>
+<p><img src="http://dongge.org/images/pic/tcp-6.png" alt=""></p>
+<p>参见wireshark抓包，实测的抓包结果并没有严格按挥手时序。我估计是时间间隔太短造成。</p>
+<h2 id="深入理解TCP连接的释放："><a href="#深入理解TCP连接的释放：" class="headerlink" title="深入理解TCP连接的释放："></a>深入理解TCP连接的释放：</h2><p>TCP协议的连接是全双工连接，一个TCP连接存在双向的读写通道。<br>简单说来是 “先关读，后关写”，一共需要四个阶段。</p>
+<p>以客户机发起关闭连接为例：</p>
+<pre><code>1.服务器读通道关闭
+2.客户机写通道关闭
+3.客户机读通道关闭
+4.服务器写通道关闭
+</code></pre><p>关闭行为是在发起方数据发送完毕之后，给对方发出一个FIN（finish）数据段。直到接收到对方发送的FIN，且对方收到了接收确认ACK之后，双方的数据通信完全结束，过程中每次接收都需要返回确认数据段ACK。</p>
+<p>详细过程：</p>
+<pre><code>第一阶段   客户机发送完数据之后，向服务器发送一个FIN数据段，序列号为i；
+1.服务器收到FIN(i)后，返回确认段ACK，序列号为i+1，关闭服务器读通道；
+2.客户机收到ACK(i+1)后，关闭客户机写通道；
+</code></pre><p>   （此时，客户机仍能通过读通道读取服务器的数据，服务器仍能通过写通道写数据）</p>
+<pre><code>第二阶段 服务器发送完数据之后，向客户机发送一个FIN数据段，序列号为j；
+3.客户机收到FIN(j)后，返回确认段ACK，序列号为j+1，关闭客户机读通道；
+4.服务器收到ACK(j+1)后，关闭服务器写通道。
+</code></pre><p>这是标准的TCP关闭两个阶段，服务器和客户机都可以发起关闭，完全对称。</p>
+<p>FIN标识是通过发送最后一块数据时设置的，标准的例子中，服务器还在发送数据，所以要等到发送完的时候，设置FIN（此时可称为TCP连接处于半关闭状态，因为数据仍可从被动关闭一方向主动关闭方传送）。如果在服务器收到FIN(i)时，已经没有数据需要发送，可以在返回ACK(i+1)的时候就设置FIN(j)标识，这样就相当于可以合并第二步和第三步。读《Linux网络编程》关闭TCP连接章节，作以下笔记：</p>
+<h2 id="TCP的TIME-WAIT和Close-Wait状态"><a href="#TCP的TIME-WAIT和Close-Wait状态" class="headerlink" title="TCP的TIME_WAIT和Close_Wait状态"></a>TCP的TIME_WAIT和Close_Wait状态</h2><p><strong>CLOSE_WAIT</strong></p>
+<p>发起TCP连接关闭的一方称为client，被动关闭的一方称为server。被动关闭的server收到FIN后，但未发出ACK的TCP状态是CLOSE_WAIT。出现这种状况一般都是由于server端代码的问题，如果你的服务器上出现大量CLOSE_WAIT，应该要考虑检查代码。</p>
+<p><strong>TIME_WAIT</strong></p>
+<p>根据TCP协议定义的3次握手断开连接规定,发起socket主动关闭的一方 socket将进入TIME_WAIT状态。TIME_WAIT状态将持续2个MSL(Max Segment Lifetime),在Windows下默认为4分钟，即240秒。TIME_WAIT状态下的socket不能被回收使用. 具体现象是对于一个处理大量短连接的服务器,如果是由服务器主动关闭客户端的连接，将导致服务器端存在大量的处于TIME_WAIT状态的socket， 甚至比处于Established状态下的socket多的多,严重影响服务器的处理能力，甚至耗尽可用的socket，停止服务。</p>
+<p>为什么需要TIME_WAIT？TIME_WAIT是TCP协议用以保证被重新分配的socket不会受到之前残留的延迟重发报文影响的机制,是必要的逻辑保证。</p>
+<p>和TIME_WAIT状态有关的系统参数有一般由3个，本厂设置如下：</p>
+<p>net.ipv4.tcp_tw_recycle = 1</p>
+<p>net.ipv4.tcp_tw_reuse = 1</p>
+<p>net.ipv4.tcp_fin_timeout = 30</p>
+<p>net.ipv4.tcp_fin_timeout，默认60s，减小fin_timeout，减少TIME_WAIT连接数量。</p>
+<p>net.ipv4.tcp_tw_reuse = 1表示开启重用。允许将TIME-WAIT sockets重新用于新的TCP连接，默认为0，表示关闭；</p>
+<p>net.ipv4.tcp_tw_recycle = 1表示开启TCP连接中TIME-WAIT sockets的快速回收，默认为0，表示关闭。</p>
+<p>为了方便描述，我给这个TCP连接的一端起名为Client，给另外一端起名为Server。上图描述的是Client主动关闭的过程，FTP协议中就这样的。如果要描述Server主动关闭的过程，只要交换描述过程中的Server和Client就可以了，HTTP协议就是这样的。</p>
+<p>描述过程：</p>
+<p>Client调用close()函数，给Server发送FIN，请求关闭连接；Server收到FIN之后给Client返回确认ACK，同时关闭读通道（不清楚就去看一下shutdown和close的差别），也就是说现在不能再从这个连接上读取东西，现在read返回0。此时Server的TCP状态转化为CLOSE_WAIT状态。</p>
+<p>Client收到对自己的FIN确认后，关闭 写通道，不再向连接中写入任何数据。</p>
+<p>接下来Server调用close()来关闭连接，给Client发送FIN，Client收到后给Server回复ACK确认，同时Client关闭读通道，进入TIME_WAIT状态。</p>
+<p>Server接收到Client对自己的FIN的确认ACK，关闭写通道，TCP连接转化为CLOSED，也就是关闭连接。</p>
+<p>Client在TIME_WAIT状态下要等待最大数据段生存期的两倍，然后才进入CLOSED状态，TCP协议关闭连接过程彻底结束。</p>
+<p>以上就是TCP协议关闭连接的过程，现在说一下TIME_WAIT状态。</p>
+<p>从上面可以看到，主动发起关闭连接的操作的一方将达到TIME_WAIT状态，而且这个状态要保持Maximum Segment Lifetime的两倍时间。为什么要这样做而不是直接进入CLOSED状态？</p>
+<p>原因有二：</p>
+<p>一、保证TCP协议的全双工连接能够可靠关闭</p>
+<p>二、保证这次连接的重复数据段从网络中消失</p>
+<p>先说第一点，如果Client直接CLOSED了，那么由于IP协议的不可靠性或者是其它网络原因，导致Server没有收到Client最后回复的ACK。那么Server就会在超时之后继续发送FIN，此时由于Client已经CLOSED了，就找不到与重发的FIN对应的连接，最后Server就会收到RST而不是ACK，Server就会以为是连接错误把问题报告给高层。这样的情况虽然不会造成数据丢失，但是却导致TCP协议不符合可靠连接的要求。所以，Client不是直接进入CLOSED，而是要保持TIME_WAIT，当再次收到FIN的时候，能够保证对方收到ACK，最后正确的关闭连接。</p>
+<p>再说第二点，如果Client直接CLOSED，然后又再向Server发起一个新连接，我们不能保证这个新连接与刚关闭的连接的端口号是不同的。也就是说有可能新连接和老连接的端口号是相同的。一般来说不会发生什么问题，但是还是有特殊情况出现：假设新连接和已经关闭的老连接端口号是一样的，如果前一次连接的某些数据仍然滞留在网络中，这些延迟数据在建立新连接之后才到达Server，由于新连接和老连接的端口号是一样的，又因为TCP协议判断不同连接的依据是socket pair，于是，TCP协议就认为那个延迟的数据是属于新连接的，这样就和真正的新连接的数据包发生混淆了。所以TCP连接还要在TIME_WAIT状态等待2倍MSL，这样可以保证本次连接的所有数据都从网络中消失。</p>
+<p>各种协议都是前人千锤百炼后得到的标准，规范。从细节中都能感受到精巧和严谨。每次深入都有同一个感觉，精妙。</p>
+<p>做个快乐的自己。</p>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+        
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2017/04/07/hello-world/" rel="prev" title="Hello World">
+                Hello World <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar.jpg"
+               alt="皮儿猪猪" />
+          <p class="site-author-name" itemprop="name">皮儿猪猪</p>
+           
+              <p class="site-description motion-element" itemprop="description">Hello Display</p>
+          
+        </div>
+        <nav class="site-state motion-element">
+
+          
+            <div class="site-state-item site-state-posts">
+              <a href="/archives">
+                <span class="site-state-item-count">2</span>
+                <span class="site-state-item-name">日志</span>
+              </a>
+            </div>
+          
+
+          
+
+          
+
+        </nav>
+
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/mudanlianmeng" target="_blank" title="GitHub">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  GitHub
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/mudanlianmeng/" target="_blank" title="微博">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  微博
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+
+        
+
+
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#建立连接："><span class="nav-number">1.</span> <span class="nav-text">建立连接：</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#TCP的包头结构："><span class="nav-number">2.</span> <span class="nav-text">TCP的包头结构：</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#关闭连接："><span class="nav-number">3.</span> <span class="nav-text">关闭连接：</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#深入理解TCP连接的释放："><span class="nav-number">4.</span> <span class="nav-text">深入理解TCP连接的释放：</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#TCP的TIME-WAIT和Close-Wait状态"><span class="nav-number">5.</span> <span class="nav-text">TCP的TIME_WAIT和Close_Wait状态</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2010 - 
+  <span itemprop="copyrightYear">2017</span>
+  <span class="with-love">
+    <i class="fa fa-皮儿猪猪"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">皮儿猪猪</span>
+</div>
+
+
+<div class="powered-by">
+  由 Github 强力驱动
+</div>
+
+<div class="theme-info">
+  Theme -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Pisces
+  </a>
+</div>
+
+
+        
+<div class="busuanzi-count">
+  <script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+  
+    <span class="site-uv">
+      <i class="fa fa-user"></i>
+      <span class="busuanzi-value" id="busuanzi_value_site_uv"></span>
+      
+    </span>
+  
+
+  
+    <span class="site-pv">
+      <i class="fa fa-eye"></i>
+      <span class="busuanzi-value" id="busuanzi_value_site_pv"></span>
+      
+    </span>
+  
+</div>
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+  
+
+
+
+
+
+  
+  <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+
+  
+  <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+
+  
+  <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+
+  
+  <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+
+  
+  <script type="text/javascript" src="/lib/canvas-nest/canvas-nest.min.js"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.0"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.0"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.0"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.0"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.0"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.1.js"></script>
+  <script>AV.initialize("BX5jcAN9KL64PuPfuouN0YQk-gzGzoHsz", "JfV8fuz3W6z799Ay6QvxVRMc");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
